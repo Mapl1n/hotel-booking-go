@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: hotel-go-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-hotel123456}
+      MYSQL_DATABASE: ${DB_NAME:-hotel_db}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    command: --default-authentication-plugin=mysql_native_password
+
+  redis:
+    image: redis:7-alpine
+    container_name: hotel-go-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    command: redis-server --appendonly yes
+
+  app:
+    build: .
+    container_name: hotel-go-app
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=${DB_PASSWORD:-hotel123456}
+      - DB_NAME=${DB_NAME:-hotel_db}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=
+      - REDIS_DB=0
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-me-to-a-random-64-char-string-in-production}
+      - JWT_EXPIRE_HOURS=24
+      - APP_ENV=production
+      - SERVER_PORT=8080
+      - SMS_PROVIDER=mock
+      - SMS_MOCK_CODE=888888
+      - PAYMENT_MODE=mock
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  redis_data:
